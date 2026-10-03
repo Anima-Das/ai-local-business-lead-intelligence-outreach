@@ -1,0 +1,1290 @@
+{
+  "name": "05 AI Local Business Lead Intelligence & Outreach Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "4d56e1bb-ddef-45f1-81a6-ee5382c3fe37",
+      "name": "Start Lead Generation",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -3376,
+        80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "queries",
+        "options": {
+          "destinationFieldName": "query"
+        }
+      },
+      "id": "c9209c7c-b969-4e8e-a0e1-e94bfd08f356",
+      "name": "Split Search Queries",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        -3152,
+        80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a3b43640-595c-484e-a023-77b119590116",
+      "name": "Process Each Query",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -2928,
+        80
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "id": "fe2cbca9-38e7-4c81-afad-d627301eb1da",
+      "name": "Rate Limit Protection",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -2704,
+        128
+      ],
+      "webhookId": "33e59095-d675-4766-99b8-334798896673",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "url": "=https://google.serper.dev/maps?q={{ $json.query }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "6cad17b2-52fd-4e34-8a4d-8b7ee428a563",
+      "name": "Fetch Maps Results (Page 1)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -2704,
+        -64
+      ],
+      "executeOnce": false,
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://google.serper.dev/maps",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 2, \"ll\": \"{{ $json.ll }}\"},\n  {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 3, \"ll\": \"{{ $json.ll }}\"},\n  {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 4, \"ll\": \"{{ $json.ll }}\"},\n {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 5, \"ll\": \"{{ $json.ll }}\"},\n {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 6, \"ll\": \"{{ $json.ll }}\"},\n {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 7, \"ll\": \"{{ $json.ll }}\"},\n {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 8, \"ll\": \"{{ $json.ll }}\"},\n {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 9, \"ll\": \"{{ $json.ll }}\"},\n {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 10, \"ll\": \"{{ $json.ll }}\"},\n {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 11, \"ll\": \"{{ $json.ll }}\"},\n {\"q\": \"{{ $json.searchParameters.q }}\", \"page\": 12, \"ll\": \"{{ $json.ll }}\"}\n]",
+        "options": {}
+      },
+      "id": "68f56401-a1e8-4a70-893b-98e3695a2391",
+      "name": "Fetch Maps Results (Pages 2–12)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -2256,
+        -64
+      ],
+      "executeOnce": false,
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [...$('Fetch Maps Results (Page 1)').all(), ...$input.all()];\nconst companies = [];\n\nresults.forEach(item => {\n  if (item.json.places) {\n    item.json.places.forEach(place => {\n      if (place.phoneNumber) {\n        const company = {\n          name: place.title || '',\n          phone: place.phoneNumber || '',\n          website: place.website,\n          rating: place.rating || null,\n          type: place.type || ''\n        };\n        \n        companies.push(company);\n      }\n    });\n  }\n});\n\nreturn companies.map(company => ({json: company}));"
+      },
+      "id": "4f5143a8-8a96-4c38-a753-b5f3ba52e9f7",
+      "name": "Extract Businesses From Maps",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -2032,
+        -64
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "7f74e264-ec6e-45a4-a0c4-4fd85f1b918d",
+      "name": "Process Businesses in Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -1808,
+        -64
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.website }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.9"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "id": "3650b9a3-2474-4dfe-b20b-9d7c4eea51dc",
+      "name": "Scrape Business Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -1584,
+        -112
+      ],
+      "typeVersion": 4.2,
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// scan entire HTML + response text\nconst html = JSON.stringify($json).toLowerCase();\n\nfunction extract(patterns) {\n  for (const pattern of patterns) {\n    const matches = html.match(pattern);\n    if (matches && matches.length) {\n      return clean(matches[0]);\n    }\n  }\n  return \"-\";\n}\n\n// remove tracking & redirect junk\nfunction clean(url) {\n  return url\n    .replace(/\\\\u002f/g, \"/\")\n    .split(\"?\")[0]\n    .replace(/amp;/g, \"\");\n}\n\n// ---------- SOCIAL DETECTION ----------\n\n// Instagram\nconst instagram = extract([\n  /https?:\\/\\/[^\"'<> ]*instagram\\.com[^\"'<> ]*/gi,\n  /instagr\\.am\\/[^\"'<> ]*/gi,\n  /instagram:[^\"'<> ]+/gi\n]);\n\n// Facebook\nconst facebook = extract([\n  /https?:\\/\\/[^\"'<> ]*facebook\\.com[^\"'<> ]*/gi,\n  /fb\\.com\\/[^\"'<> ]*/gi\n]);\n\n// LinkedIn\nconst linkedin = extract([\n  /https?:\\/\\/[^\"'<> ]*linkedin\\.com[^\"'<> ]*/gi\n]);\n\n// Twitter / X\nconst twitter = extract([\n  /https?:\\/\\/[^\"'<> ]*(twitter|x)\\.com[^\"'<> ]*/gi\n]);\n\n// YouTube\nconst youtube = extract([\n  /https?:\\/\\/[^\"'<> ]*youtube\\.com[^\"'<> ]*/gi\n]);\n\n// TikTok\nconst tiktok = extract([\n  /https?:\\/\\/[^\"'<> ]*tiktok\\.com[^\"'<> ]*/gi\n]);\n\n\n// ---------- EMAIL EXTRACTION ----------\nfunction extractEmails(html) {\n\n  const text = html\n    .replace(/\\[at\\]/gi, \"@\")\n    .replace(/\\(at\\)/gi, \"@\")\n    .replace(/\\s+at\\s+/gi, \"@\")\n    .replace(/\\[dot\\]/gi, \".\")\n    .replace(/\\(dot\\)/gi, \".\")\n    .replace(/\\s+dot\\s+/gi, \".\");\n\n  const emailRegex = /mailto:([a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,})|([a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,})/gi;\n\n  const matches = [...text.matchAll(emailRegex)].map(m => m[1] || m[2]);\n\n  const badPatterns = [\n    \"example.com\",\n    \"domain.com\",\n    \"email.com\",\n    \"test.com\",\n    \"user@\",\n    \"admin@domain\",\n    \"yourname@\",\n    \"noreply@\",\n    \"donotreply@\"\n  ];\n\n  const cleaned = matches\n    .map(e => e.toLowerCase().trim())\n    .filter(e =>\n      e &&\n      !badPatterns.some(b => e.includes(b))\n    );\n\n  return [...new Set(cleaned)];\n}\n\n// run extraction\nconst emails = extractEmails(html);\n\n// choose best email\nconst email = emails.length ? emails[0] : \"\";\n\n\nreturn {\n  ...$('Extract Businesses From Maps').item.json,\n  email,\n  instagram,\n  facebook,\n  linkedin,\n  twitter,\n  youtube,\n  tiktok\n};\n"
+      },
+      "id": "3e687f88-a603-4b04-978b-0868f8447327",
+      "name": "Extract Socials & Email",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1360,
+        -112
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Business name\nconst name = ($json.name || \"\").replace(/[^\\w\\s]/gi, '').trim();\n\n\n// Optional: add city if available\nconst city = ($json.city || \"\").trim();\n\n// Remove accents (é → e)\nconst normalize = str =>\n  str.normalize(\"NFD\").replace(/[\\u0300-\\u036f]/g, \"\");\n\n// Clean symbols & punctuation\nconst clean = normalize(name)\n  .replace(/&/g, \" and \")\n  .replace(/\\+/g, \" and \")\n  .replace(/@/g, \"\")\n  .replace(/'/g, \"\")\n  .replace(/\\./g, \"\")\n  .replace(/-/g, \" \")\n  .replace(/\\//g, \" \")\n  .replace(/\\s+/g, \" \")\n  .trim();\n\n// Remove noise business words (optional but improves accuracy)\nconst noiseWords = [\n  \"cafe\",\"bakery\",\"restaurant\",\"shop\",\"store\",\n  \"kitchen\",\"bar\",\"grill\",\"coffee\",\"house\"\n];\n\nconst simplified = clean\n  .split(\" \")\n  .filter(w => !noiseWords.includes(w.toLowerCase()))\n  .join(\" \");\n\n// Build search variations\nconst variations = [\n  `\"${name}\"`,\n  `\"${clean}\"`,\n  `\"${simplified}\"`,\n  clean,\n  simplified\n];\n\n// Add location variations (if available)\nif (city) {\n  variations.push(`\"${name}\" ${city}`);\n  variations.push(`${clean} ${city}`);\n}\n\n// Remove duplicates & empty strings\nconst uniqueQueries = [...new Set(variations.filter(Boolean))];\n\n// Force search only social platforms\nconst socialSites = `\n(site:instagram.com OR\n site:facebook.com OR\n site:linkedin.com OR\n site:tiktok.com OR\n site:youtube.com OR\n site:twitter.com OR\n site:x.com)\n`;\n\n// Build final search query\nconst finalQuery = `${uniqueQueries.join(\" OR \")} ${socialSites}`;\n\nreturn {\n  ...$json,\n  smartQuery: finalQuery\n};\n"
+      },
+      "id": "71c648c4-18b6-46e8-a49b-f37145464b05",
+      "name": "Build Social Search Query",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1136,
+        -48
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://google.serper.dev/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"q\": \"{{ $json.name }}\",\n  \"num\": 10,\n  \"gl\": \"us\",\n  \"sites\": [\n    \"instagram.com\",\n    \"facebook.com\",\n    \"linkedin.com\",\n    \"tiktok.com\",\n    \"youtube.com\",\n    \"twitter.com\",\n    \"x.com\"\n  ]\n}\n",
+        "options": {}
+      },
+      "id": "788fad3b-64ae-498b-ae1a-10cfa236b1b8",
+      "name": "Search Social Profiles (Serper)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -912,
+        -48
+      ],
+      "typeVersion": 4.3
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "f5a8f160-f7ee-4da8-80fb-6fd533873689",
+      "name": "Combine Website + Serper Results",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        -464,
+        -112
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function clean(url) {\n  if (!url || url === \"-\") return \"\";\n\n  const badPatterns = [\n    \"/p/\",              // instagram posts\n    \"/reel/\",\n    \"watch?v=\",         // youtube videos\n    \"youtu.be/\",\n    \"discover\",         // tiktok discover pages\n    \"/video/\",\n    \"/videos/\",\n    \"share\",\n    \"sharer\",\n    \"intent\",\n    \"status\"\n  ];\n\n  const lower = url.toLowerCase();\n\n  for (const bad of badPatterns) {\n    if (lower.includes(bad)) return \"\";\n  }\n\n  return url.trim().replace(/\\/$/, \"\");\n}\n\n\nfunction username(url){\n  if(!url) return \"\";\n  return url.split(\"/\").pop().toLowerCase();\n}\n\nfunction merge(primary, fallback) {\n\n  const p = clean(primary);\n  const f = clean(fallback);\n\n  // CASE: nothing found\n  if (!p && !f) {\n    return { url: \"-\", confidence: \"LOW\" };\n  }\n\n  // CASE: website only\n  if (p && !f) {\n    return { url: p, confidence: \"HIGH\" };\n  }\n\n  // CASE: serper only\n  if (!p && f) {\n    return { url: f, confidence: \"MEDIUM\" };\n  }\n\n  // CASE: both exist & same handle\n  if (username(p) === username(f)) {\n    return { url: p, confidence: \"HIGH\" };\n  }\n\n  // CASE: both exist but different\n  return {\n    url: `${p} | ${f}`,\n    confidence: \"MEDIUM\"\n  };\n}\n\nconst instagram = merge($json.instagram, $json.serperInstagram);\nconst facebook  = merge($json.facebook, $json.serperFacebook);\nconst linkedin  = merge($json.linkedin, $json.serperLinkedin);\nconst twitter   = merge($json.twitter, $json.serperTwitter);\nconst youtube   = merge($json.youtube, $json.serperYoutube);\nconst tiktok    = merge($json.tiktok, $json.serperTiktok);\n\nreturn {\n  ...$json,\n\n  instagram: instagram.url,\n  instagramConfidence: instagram.confidence,\n\n  facebook: facebook.url,\n  facebookConfidence: facebook.confidence,\n\n  linkedin: linkedin.url,\n  linkedinConfidence: linkedin.confidence,\n\n  twitter: twitter.url,\n  twitterConfidence: twitter.confidence,\n\n  youtube: youtube.url,\n  youtubeConfidence: youtube.confidence,\n\n  tiktok: tiktok.url,\n  tiktokConfidence: tiktok.confidence\n};\n"
+      },
+      "id": "dbdfe4f6-37ac-4677-b81f-9dc6aaa2e285",
+      "name": "Resolve & Score Social Profiles",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -240,
+        -112
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function safe(value) {\n  if (value === undefined || value === null) return \"-\";\n  if (typeof value === \"string\" && value.trim() === \"\") return \"-\";\n  return value;\n}\n\nreturn {\n  json: {\n\n    // BUSINESS INFO\n    name: safe($json.name),\n    website: safe($json.website),\n    phone: safe($json.phone),\n    rating: safe($json.rating),\n    type: safe($json.type),\n\n    // EMAIL (important for validation)\n    email: $json.email || \"\",\n\n    // SOCIALS\n    instagram: safe($json.instagram),\n    facebook: safe($json.facebook),\n    linkedin: safe($json.linkedin),\n    twitter: safe($json.twitter),\n    youtube: safe($json.youtube),\n    tiktok: safe($json.tiktok),\n\n    // CONFIDENCE\n    instagramConfidence: safe($json.instagramConfidence) || \"LOW\",\n    facebookConfidence: safe($json.facebookConfidence) || \"LOW\",\n    linkedinConfidence: safe($json.linkedinConfidence) || \"LOW\",\n    twitterConfidence: safe($json.twitterConfidence) || \"LOW\",\n    youtubeConfidence: safe($json.youtubeConfidence) || \"LOW\",\n    tiktokConfidence: safe($json.tiktokConfidence) || \"LOW\"\n\n  }\n};\n"
+      },
+      "id": "f4157d6c-4828-4c79-bd16-2f0ad11f99b4",
+      "name": "Normalize Social Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -16,
+        0
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "4c59052f-cbb3-4638-a74d-0337f1e063b2",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $('Normalize Social Data').item.json.email }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "id": "b337cbd1-3d3a-4e7d-888f-5de81c70ed8f",
+      "name": "Check Email Exists",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -1584,
+        -432
+      ],
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "url": "https://rapid-email-verifier.fly.dev/api/validate",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $json.email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5b9ef8f4-de6a-4060-96c8-fde76397cd13",
+      "name": "Validate Email Address",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -1360,
+        -528
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const original = $('Check Email Exists').item.json;\nconst result = $json.result || $json.status || \"\";\n\nlet email = original.email || \"\";\nlet emailStatus = \"VALID\";\n\nif (result === \"invalid\" || result === \"undeliverable\") {\n  email = \"\";\n  emailStatus = \"NOT_FOUND_OR_INVALID\";\n}\nelse if (result === \"risky\" || result === \"catch-all\" || result === \"unknown\") {\n  emailStatus = \"RISKY\";\n}\n\nreturn {\n  json: {\n\n    // BUSINESS INFO\n    name: original.name || \"-\",\n    website: original.website || \"-\",\n    phone: original.phone || \"-\",\n    rating: original.rating || \"-\",\n    type: original.type || \"-\",\n\n    // EMAIL\n    email,\n    emailStatus,\n\n    // SOCIALS\n    instagram: original.instagram || \"-\",\n    facebook: original.facebook || \"-\",\n    linkedin: original.linkedin || \"-\",\n    twitter: original.twitter || \"-\",\n    youtube: original.youtube || \"-\",\n    tiktok: original.tiktok || \"-\",\n\n    // CONFIDENCE\n    instagramConfidence: original.instagramConfidence || \"LOW\",\n    facebookConfidence: original.facebookConfidence || \"LOW\",\n    linkedinConfidence: original.linkedinConfidence || \"LOW\",\n    twitterConfidence: original.twitterConfidence || \"LOW\",\n    youtubeConfidence: original.youtubeConfidence || \"LOW\",\n    tiktokConfidence: original.tiktokConfidence || \"LOW\"\n  }\n};\n"
+      },
+      "id": "d133ceb3-2a03-441f-91e5-fe9018abb0b7",
+      "name": "Prepare Valid Leads",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1136,
+        -528
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $json;\n\nreturn {\n  json: {\n\n    // BUSINESS INFO\n    name: data.name || \"-\",\n    website: data.website || \"-\",\n    phone: data.phone || \"-\",\n    rating: data.rating || \"-\",\n    type: data.type || \"-\",\n\n    // EMAIL\n    email: \"\",\n    emailStatus: \"NOT_FOUND\",\n\n    // SOCIALS\n    instagram: data.instagram || \"-\",\n    facebook: data.facebook || \"-\",\n    linkedin: data.linkedin || \"-\",\n    twitter: data.twitter || \"-\",\n    youtube: data.youtube || \"-\",\n    tiktok: data.tiktok || \"-\",\n\n    // CONFIDENCE\n    instagramConfidence: data.instagramConfidence || \"LOW\",\n    facebookConfidence: data.facebookConfidence || \"LOW\",\n    linkedinConfidence: data.linkedinConfidence || \"LOW\",\n    twitterConfidence: data.twitterConfidence || \"LOW\",\n    youtubeConfidence: data.youtubeConfidence || \"LOW\",\n    tiktokConfidence: data.tiktokConfidence || \"LOW\"\n\n  }\n};\n"
+      },
+      "id": "6358ef6d-4222-43b7-9863-9c205a209103",
+      "name": "Prepare Leads Without Email",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1136,
+        -336
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {},
+      "id": "7e56711b-51d7-4e35-93bd-0f20e5b85258",
+      "name": "Merge Lead Results",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        -912,
+        -432
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function safe(value) {\n  if (value === undefined || value === null) return \"-\";\n  if (typeof value === \"string\" && value.trim() === \"\") return \"-\";\n  return value;\n}\n\n\nfunction formatPhone(phone) {\n  if (!phone || phone === \"-\") return \"-\";\n\n  // remove everything except digits and +\n  phone = phone.toString().replace(/[^\\d+]/g, \"\");\n\n  // remove leading +\n  phone = phone.replace(/^\\+/, \"\");\n\n  // if too short → return original\n  if (phone.length < 7) return phone;\n\n  // detect country code (1–3 digits)\n  let countryCode = \"\";\n  let rest = \"\";\n\n  if (phone.length > 10) {\n    countryCode = phone.slice(0, phone.length - 10);\n    rest = phone.slice(-10);\n  } else {\n    rest = phone;\n  }\n\n  // US-style formatting\n  if (!countryCode && rest.length === 10) {\n    const formatted = `(${rest.slice(0,3)}) ${rest.slice(3,6)}-${rest.slice(6)}`;\n    return `'${formatted}`;   // force text for Sheets\n  }\n\n  // group remaining digits nicely\n  function groupDigits(num) {\n    return num.replace(/(\\d{2,4})(?=\\d)/g, \"$1 \");\n  }\n\n  const formattedIntl = `(+${countryCode}) ${groupDigits(rest)}`;\n\n  return `'${formattedIntl}`;   // force text for Sheets\n}\n\nreturn {\n  json: {\n\n    // BUSINESS INFO\n    website: safe($json.website),\n    name: safe($json.name),\n\n    //  PHONE SAFE FORMAT\n    phone: formatPhone($json.phone),\n\n    rating: safe($json.rating),\n    type: safe($json.type),\n\n    // EMAIL\n    email: safe($json.email),\n    emailStatus: safe($json.emailStatus),\n\n    // SOCIALS\n    instagram: safe($json.instagram),\n    facebook: safe($json.facebook),\n    linkedin: safe($json.linkedin),\n    twitter: safe($json.twitter),\n    youtube: safe($json.youtube),\n    tiktok: safe($json.tiktok),\n\n    // CONFIDENCE\n    instagramConfidence: safe($json.instagramConfidence),\n    facebookConfidence: safe($json.facebookConfidence),\n    linkedinConfidence: safe($json.linkedinConfidence),\n    twitterConfidence: safe($json.twitterConfidence),\n    youtubeConfidence: safe($json.youtubeConfidence),\n    tiktokConfidence: safe($json.tiktokConfidence)\n  }\n};\n"
+      },
+      "id": "407affaa-544b-4381-b825-0ae39bee3cc0",
+      "name": "Clean Lead Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -688,
+        -432
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "website, name",
+        "options": {}
+      },
+      "id": "8575867b-41e1-45e0-8ff2-6b4536551507",
+      "name": "Remove Duplicate Leads",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "position": [
+        -240,
+        -432
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "95c36fe5-2dcc-4bc0-9a64-13e7209b34f5",
+      "name": "Process Leads for AI Enrichment",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -16,
+        -432
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "1c7df96c-172b-44a9-9371-c7ae2409341f",
+      "name": "AI Rate Limit Buffer",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        208,
+        -336
+      ],
+      "webhookId": "08987f8e-f762-4c5a-af57-ec38e26d6f8a",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "YOUR_OLLAMA_URL/api/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3\",\n  \"prompt\": \"Analyze this local business.\\n\\nBusiness Name: {{$json.name}}\\nBusiness Type: {{$json.type}}\\nWebsite: {{$json.website}}\\nRating: {{$json.rating}}\\n\\nIf website or details are missing, intelligently infer from the business name and type.\\n\\nReturn ONLY valid JSON:\\n{\\n  \\\"services\\\": [\\\"\\\", \\\"\\\"],\\n  \\\"summary\\\": \\\"\\\"\\n}\\n\\nRules:\\n- services must list main offerings\\n- summary must be ONE natural sentence\\n- summary must be specific to the business\\n- DO NOT repeat the same phrasing\\n- DO NOT leave fields empty\\n- infer logically if data missing\\n- DO NOT include markdown\\n- RETURN ONLY JSON\",\n  \"stream\": false\n}\n",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "3107235a-4323-4691-8e0e-5d771daf7ebe",
+      "name": "Analyze Business (AI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        432,
+        -256
+      ],
+      "typeVersion": 4.3
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let raw = $json.response || \"\";\n\n// extract JSON block\nconst match = raw.match(/\\{[\\s\\S]*\\}/);\n\nlet parsed = null;\n\ntry {\n  parsed = match ? JSON.parse(match[0]) : null;\n} catch (e) {\n  parsed = null;\n}\n\n// fallback intelligent generation\nconst services =\n  parsed?.services?.length\n    ? parsed.services.join(\", \")\n    : ($json.type\n        ? `${$json.type}`\n        : \"Local business services\");\n\nconst summary =\n  parsed?.summary\n    ? parsed.summary\n    : `${$json.name} is a local ${$json.type || \"business\"} offering quality products and services to its community.`;\n\nreturn {\n  ...$json,\n  services,\n  summary\n};\n"
+      },
+      "id": "3f070a5d-ad51-4f77-a5bf-49a3a0a2ab38",
+      "name": "Extract AI Insights",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        208,
+        -528
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "2dcd10ce-e7d8-47ae-ab0f-16a3f3109b11",
+      "name": "AI Processing Buffer",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        432,
+        -528
+      ],
+      "webhookId": "deee8881-b921-4bce-ae19-bd87f24e7aa5",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "1a08557e-e78b-4067-a975-4326a771d978",
+      "name": "Message Rate Limit Buffer",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        880,
+        -432
+      ],
+      "webhookId": "5faee81d-6077-40f3-9dfe-299c924fcec6",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "993a040d-a2f1-4bfc-90ee-5da39a4c2140",
+      "name": "Process Outreach Message",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        656,
+        -528
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "YOUR_OLLAMA_URL/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3\",\n  \"prompt\": \"Write a short, friendly outreach message to the business below.\\n\\nBusiness Name: {{ $('Clean Lead Data').item.json.name }}\\nBusiness Type: {{ $('Clean Lead Data').item.json.type }}\\nWebsite: {{ $('Clean Lead Data').item.json.website }}\\n\\nYou are an AI automation specialist reaching out to help them improve operations and increase bookings.\\n\\nThe message should:\\n- be 2–3 sentences\\n- sound natural and human\\n- NOT sound salesy or spammy\\n- suggest improving bookings, customer engagement, or reducing manual work\\n- NOT pretend to be the business\\n- NOT mention AI unless natural\\n\\nReturn ONLY the message text.\",\n  \"stream\": false\n}\n",
+        "options": {}
+      },
+      "id": "759413b1-0d67-4820-a642-6e0fa49cffe8",
+      "name": "Create Outreach Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1104,
+        -352
+      ],
+      "typeVersion": 4.3
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let msg = $json.response || \"\";\n\n// remove intro lines AI sometimes adds\nmsg = msg.replace(/Here is.*?:/i, \"\").trim();\n\n// remove quotes\nmsg = msg.replace(/^[\"']|[\"']$/g, \"\");\n\n// remove extra newlines\nmsg = msg.replace(/\\n+/g, \" \");\n\nreturn {\n  json: {\n    ...$json,\n    message: msg\n  }\n};\n"
+      },
+      "id": "6bbc0c50-4c32-4c31-9159-9eb3070c97b9",
+      "name": "Clean Outreach Message",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        880,
+        -624
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let score = 0;\n\nconst website = $json.website || \"-\";\nconst rating = Number($json.rating) || 0;\nconst emailStatus = $json.emailStatus || \"NOT_FOUND\";\n\nconst socials = [\n  $json.instagram,\n  $json.facebook,\n  $json.linkedin,\n  $json.twitter,\n  $json.tiktok,\n  $json.youtube\n];\n\n// count socials safely\nconst activeSocials = socials.filter(\n  s => s && s !== \"-\" && s !== \"\"\n).length;\n\n\n//  WEBSITE (credibility)\nif (website !== '-') score += 2;\nelse score += 1; // still a valid lead\n\n\n// INSTAGRAM (best outreach channel)\nif ($json.instagram && $json.instagram !== \"-\") score += 2;\n\n\n// MULTIPLE SOCIALS (brand presence)\nif (activeSocials >= 3) score += 3;\nelse if (activeSocials >= 1) score += 2;\n\n\n// RATING QUALITY\nif (rating >= 4.6) score += 2;\nelse if (rating >= 4.2) score += 1;\n\n\n// EMAIL VALIDITY (direct contact)\nif (emailStatus === \"VALID\") score += 1;\n\n\n// GROWTH OPPORTUNITY BONUS\n// businesses without socials are easy wins\nif (activeSocials === 0) score += 1;\n\nif ($json.instagram && website === '-') score += 2;\n\n\n\n// normalize to max 10\nscore = Math.min(Math.round(score), 10);\n\nreturn {\n  ...$json,\n  leadScore: `${score}/10`\n};\n"
+      },
+      "id": "c403799d-9ab0-4e76-ac64-95b45b6fa93a",
+      "name": "Calculate Lead Score",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -464,
+        -432
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "columns": {
+          "value": {
+            "Name": "={{ $('Clean Lead Data').item.json.name }}",
+            "Type": "={{ $('Clean Lead Data').item.json.type }}",
+            "Email": "={{ $('Clean Lead Data').item.json.email }}",
+            "Phone": "={{ $('Clean Lead Data').item.json.phone }}",
+            "Rating": "={{ $('Clean Lead Data').item.json.rating }}",
+            "Tiktok": "={{ $('Clean Lead Data').item.json.tiktok }}",
+            "Twitter": "={{ $('Clean Lead Data').item.json.twitter }}",
+            "Website": "={{ $('Clean Lead Data').item.json.website }}",
+            "Youtube": "={{ $('Clean Lead Data').item.json.youtube }}",
+            "Facebook": "={{ $('Clean Lead Data').item.json.facebook }}",
+            "Linkedin": "={{ $('Clean Lead Data').item.json.linkedin }}",
+            "Instagram": "={{ $('Clean Lead Data').item.json.instagram }}",
+            "LeadScore": "={{ $('Calculate Lead Score').item.json.leadScore }}",
+            "Summary (AI)": "={{ $('Extract AI Insights').item.json.summary }}",
+            "Email\n Status": "={{ $('Clean Lead Data').item.json.emailStatus }}",
+            "Services (AI)": "={{ $('Extract AI Insights').item.json.services }}",
+            "Draft message (AI)": "={{ $('Clean Outreach Message').item.json.message }}",
+            "Tiktok\n Confidence": "={{ $('Clean Lead Data').item.json.tiktokConfidence }}",
+            "Twitter\n Confidence": "={{ $('Clean Lead Data').item.json.twitterConfidence }}",
+            "Youtube\n Confidence": "={{ $('Clean Lead Data').item.json.youtubeConfidence }}",
+            "Facebook\n Confidence": "={{ $('Clean Lead Data').item.json.facebookConfidence }}",
+            "Linkedln\n Confidence": "={{ $('Clean Lead Data').item.json.linkedinConfidence }}",
+            "Instagram\n Confidence": "={{ $('Clean Lead Data').item.json.instagramConfidence }}"
+          },
+          "schema": [
+            {
+              "id": "Name",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Website",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Email",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email\n Status",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Email\n Status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Phone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Rating",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Rating",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Type",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Instagram",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Instagram",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Instagram\n Confidence",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Instagram\n Confidence",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Facebook",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Facebook",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Facebook\n Confidence",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Facebook\n Confidence",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Linkedin",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Linkedin",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Linkedln\n Confidence",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Linkedln\n Confidence",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Twitter",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Twitter",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Twitter\n Confidence",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Twitter\n Confidence",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tiktok",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Tiktok",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tiktok\n Confidence",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Tiktok\n Confidence",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Youtube",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Youtube",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Youtube\n Confidence",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Youtube\n Confidence",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Services (AI)",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Services (AI)",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary (AI)",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Summary (AI)",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LeadScore",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "LeadScore",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Draft message (AI)",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Draft message (AI)",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Name"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "840c7c3f-fd4a-446a-82f2-309ad7b23907",
+      "name": "Save Leads to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1104,
+        -624
+      ],
+      "typeVersion": 4.5
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const text = JSON.stringify($json);\n\n// find first match helper\nfunction find(pattern) {\n  const match = text.match(pattern);\n  return match ? match[0] : \"-\";\n}\n\nreturn {\n  ...$json,\n\n  serperInstagram: find(/https?:\\/\\/(www\\.)?instagram\\.com\\/(?!reel|p\\/)[^\"& ]+/i),\n\n  serperFacebook: find(/https?:\\/\\/(www\\.)?facebook\\.com\\/(?!share|sharer|videos)[^\"& ]+/i),\n\n  serperLinkedin: find(/https?:\\/\\/(www\\.)?linkedin\\.com\\/company\\/[^\"& ]+/i),\n\n  serperTwitter: find(/https?:\\/\\/(twitter|x)\\.com\\/[^\"& ]+/i),\n\n  serperYoutube: find(/https?:\\/\\/(www\\.)?youtube\\.com\\/(@|channel|c\\/)[^\"& ]+/i),\n\n  serperTiktok: find(/https?:\\/\\/(www\\.)?tiktok\\.com\\/@[^\"& ]+/i)\n};\n"
+      },
+      "id": "4210d5bc-ce02-462e-b70e-e0b710d74c00",
+      "name": "Parse Social Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -688,
+        -48
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {},
+      "id": "57de1316-e4ae-44a6-971e-56ab18b6bffc",
+      "name": "Delay Between Requests",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -2480,
+        -64
+      ],
+      "webhookId": "f34170c1-8d80-4255-9b12-3ca8a4f65f20",
+      "typeVersion": 1.1
+    }
+  ],
+  "pinData": {
+    "Start Lead Generation": [
+      {
+        "json": {
+          "queries": [
+            "bakery littlevenice"
+          ]
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Clean Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Calculate Lead Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Exists": {
+      "main": [
+        [
+          {
+            "node": "Validate Email Address",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Leads Without Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Lead Results": {
+      "main": [
+        [
+          {
+            "node": "Clean Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Each Query": {
+      "main": [
+        [
+          {
+            "node": "Fetch Maps Results (Page 1)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Protection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AI Insights": {
+      "main": [
+        [
+          {
+            "node": "AI Processing Buffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Valid Leads": {
+      "main": [
+        [
+          {
+            "node": "Merge Lead Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Processing Buffer": {
+      "main": [
+        [
+          {
+            "node": "Process Outreach Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Rate Limit Buffer": {
+      "main": [
+        [
+          {
+            "node": "Analyze Business (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Lead Score": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicate Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Social Results": {
+      "main": [
+        [
+          {
+            "node": "Combine Website + Serper Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Split Search Queries": {
+      "main": [
+        [
+          {
+            "node": "Process Each Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Business (AI)": {
+      "main": [
+        [
+          {
+            "node": "Process Leads for AI Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Social Data": {
+      "main": [
+        [
+          {
+            "node": "Process Businesses in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Protection": {
+      "main": [
+        [
+          {
+            "node": "Process Each Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Lead Generation": {
+      "main": [
+        [
+          {
+            "node": "Split Search Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Outreach Message": {
+      "main": [
+        [
+          {
+            "node": "Save Leads to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delay Between Requests": {
+      "main": [
+        [
+          {
+            "node": "Fetch Maps Results (Pages 2–12)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicate Leads": {
+      "main": [
+        [
+          {
+            "node": "Process Leads for AI Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email Address": {
+      "main": [
+        [
+          {
+            "node": "Prepare Valid Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Outreach Message": {
+      "main": [
+        [
+          {
+            "node": "Process Outreach Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Socials & Email": {
+      "main": [
+        [
+          {
+            "node": "Combine Website + Serper Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Social Search Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Business Website": {
+      "main": [
+        [
+          {
+            "node": "Extract Socials & Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Outreach Message": {
+      "main": [
+        [
+          {
+            "node": "Clean Outreach Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message Rate Limit Buffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Social Search Query": {
+      "main": [
+        [
+          {
+            "node": "Search Social Profiles (Serper)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Rate Limit Buffer": {
+      "main": [
+        [
+          {
+            "node": "Create Outreach Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Maps Results (Page 1)": {
+      "main": [
+        [
+          {
+            "node": "Delay Between Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Leads Without Email": {
+      "main": [
+        [
+          {
+            "node": "Merge Lead Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Extract Businesses From Maps": {
+      "main": [
+        [
+          {
+            "node": "Process Businesses in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Businesses in Batches": {
+      "main": [
+        [
+          {
+            "node": "Check Email Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Scrape Business Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Leads for AI Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Extract AI Insights",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Rate Limit Buffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve & Score Social Profiles": {
+      "main": [
+        [
+          {
+            "node": "Normalize Social Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Social Profiles (Serper)": {
+      "main": [
+        [
+          {
+            "node": "Parse Social Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Website + Serper Results": {
+      "main": [
+        [
+          {
+            "node": "Resolve & Score Social Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Maps Results (Pages 2–12)": {
+      "main": [
+        [
+          {
+            "node": "Extract Businesses From Maps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "285dbde7-a64d-43b0-aa10-ed8764086de9",
+  "meta": {
+    "instanceId": "97039511d7868ab0b903b5b74dcd4abfc433b51b62d833c08dd157497493ed2a"
+  },
+  "nodeGroups": [],
+  "id": "AaPQsBHoh5E9mVsC",
+  "tags": []
+}
