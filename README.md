@@ -41,10 +41,7 @@ Search queries go in. Structured, scored, outreach-ready lead rows come out in G
 | **Persistence** | Google Sheets, append-or-update matched on `Name` | Final structured lead output |
 | **Rate Limiting** | Five Wait nodes and four batch loops | Pace requests to external services |
 
-> [!NOTE]
-> The exported workflow has `active` set to `false`. It is a workflow export for documentation and import, and nothing in the JSON establishes a deployment, runtime results, or production use.
 
----
 
 ## 🖼️ Workflow Overview
 
